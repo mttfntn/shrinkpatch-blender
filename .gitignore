@@ -1,0 +1,10 @@
+# Blender scenes and backups stay local (demo scene is not part of the repo)
+*.blend
+*.blend1
+*.blend[0-9]*
+# build output
+*.zip
+dist/
+# Python caches
+__pycache__/
+*.pyc
