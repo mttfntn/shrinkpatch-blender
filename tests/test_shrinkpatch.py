@@ -224,6 +224,24 @@ class TestInsetsAndCuts(PatchCase):
                     worst = max(worst, dp - ds)
         self.assertLess(worst, 1e-4)
 
+    def test_inset_without_normal_transfer(self):
+        # regression: with Transfer Normals off there is no edge group and the
+        # cutter build raised TypeError (1.12.0)
+        p = self.make_inset(transfer_normals=False)
+        self.assertIsNone(p.modifiers.get(sp.TRANSFER_NAME))
+        self.assertIsNotNone(sp.autocut_of(p))
+        self.assertGreater(fx.ray_down_local(self.surface, (0, 0), p), 2.0 + 0.4)
+
+    def test_proxy_in_sync_is_not_rebuilt(self):
+        # regression: the cut Boolean is the surface's active modifier; comparing that
+        # UI flag made the proxy look out of date forever, so it was rebuilt (and every
+        # patch re-evaluated) on each check (1.12.0)
+        self.make_inset()
+        self.assertTrue(self.surface.modifiers[sp.CUTS_NAME].is_active)
+        self.assertFalse(sp.sync_proxy_if_needed(self.surface))
+        bpy.context.view_layer.update()
+        self.assertEqual(sp.process_watch()["proxies"], [])
+
     def test_duplicate_and_delete_keep_the_collection_consistent(self):
         p = self.make_inset()
         coll = sp.cut_collection(self.surface, create=False)

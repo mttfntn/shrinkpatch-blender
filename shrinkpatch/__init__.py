@@ -389,11 +389,22 @@ def build_autocut_mesh(patch, mesh, depsgraph, edge_group=None):
     bm.normal_update()
     size = max((v.co.xy.length for v in bm.verts), default=1.0) or 1.0
     eps = size * (0.006 if coarse else 0.004)  # a bit more margin for the coarser cutter
+    # The coarse faces are flat chords between vertices that lie on the fine surface:
+    # in a tightly curved bowl they rise above it. Measure how far, and sink the
+    # inside of the cutter by that much more, so the surface never shows through.
+    sag = 0.0
+    if fine is not None:
+        for f in bm.faces:
+            c = f.calc_center_median()
+            loc, nor = fine.find_nearest(c)[:2]
+            if loc is not None:
+                sag = max(sag, (c - loc).dot(nor))
     deform = bm.verts.layers.deform.active
-    gi = patch.vertex_groups[edge_group].index if edge_group in patch.vertex_groups else None
+    gi = patch.vertex_groups[edge_group].index if edge_group and edge_group in patch.vertex_groups else None
     for v, n in [(v, v.normal.copy()) for v in bm.verts]:
         w = v[deform].get(gi, 0.0) if (deform is not None and gi is not None) else 0.0
-        v.co += n * (eps * (2.0 * w - 1.0))   # -eps inside, +eps at the contact edge
+        # -(eps + sag) inside, +eps at the contact edge (the cut edge hides under the flange)
+        v.co += n * (eps * (2.0 * w - 1.0) - sag * (1.0 - w))
     # lid above both the rim and the base centre: on a convex surface the rim curves
     # down while the surface under the centre stays at base height, and it must be
     # inside the cutter or a cap of surface is left over the inset
@@ -944,6 +955,7 @@ def _stick_update(self, context):
                 "snap_elements_individual": list(ts.snap_elements_individual),
                 "snap_target": ts.snap_target,
                 "use_snap_align_rotation": ts.use_snap_align_rotation,
+                "use_snap_translate": ts.use_snap_translate,
             }
         ts.use_snap = True
         ts.snap_elements_base = {'FACE'}
@@ -957,6 +969,7 @@ def _stick_update(self, context):
         ts.snap_elements_individual = set(store["snap_elements_individual"])
         ts.snap_target = store["snap_target"]
         ts.use_snap_align_rotation = store["use_snap_align_rotation"]
+        ts.use_snap_translate = store.get("use_snap_translate", True)  # older files did not store it
         del context.scene["_shrink_patch_prev_snap"]
 
 
@@ -1756,14 +1769,19 @@ def remember_placement(patch):
         _watch["rel"][patch.name] = key
 
 
+_UI_ONLY = {"name", "rna_type", "is_active", "show_expanded"}  # interface state, not geometry
+
+
 def _modifier_signature(obj, skip_cuts=False):
+    """Every setting of every modifier (cuts optionally skipped): equal signatures
+    mean the proxy evaluates exactly like the surface."""
     sig = []
     for m in obj.modifiers:
         if skip_cuts and m.name.startswith(CUT_PREFIX):
             continue
         vals = [m.name, m.type]
         for prop in m.bl_rna.properties:
-            if prop.is_readonly or prop.identifier in {"name", "rna_type"} or prop.type == 'COLLECTION':
+            if prop.is_readonly or prop.identifier in _UI_ONLY or prop.type == 'COLLECTION':
                 continue
             v = getattr(m, prop.identifier, None)
             if prop.type == 'POINTER':
