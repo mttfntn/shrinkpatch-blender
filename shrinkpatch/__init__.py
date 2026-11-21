@@ -1,43 +1,42 @@
-"""Shrink Patch: stick patch meshes onto a target surface, interactively.
+"""Shrink Patch: place patch meshes on a surface, wrap them, blend their shading
+and (for insets) cut the surface open. Blender 5.3 extension, single module.
 
-Workflow
-  * Select the surface (e.g. the sphere), shift-select the patch (ACTIVE), then
-    N-panel > Shrink Patch > "Place on Surface" (or Object menu / right-click menu).
-  * Move the mouse over the surface: the patch follows it, aligned to the normal,
-    its base vertex group shrinkwrapped and normals transferred live.
-        Wheel            scale
-        Shift + Wheel    rotate around the normal
-        Ctrl + Wheel     lift / sink (offset)
-        LMB / Enter      confirm        RMB / Esc   cancel
-        MMB              navigate the view while placing
-  * Later, select any patch (or its surface) and use "Move" in the overview to
-    slide it again, or "Snap" to re-stick it after moving it with G.
-  * Select a surface to see every patch that is applied to it.
-  * "Duplicate on Surface" copies a patch and lets you place the copy; in Place
-    mode press D to stamp a copy at the current spot and keep going.
-  * "Stick While Moving" turns on Blender's face snapping (active origin, align
-    rotation) so plain G / Shift+D keep patches on the surface. Use "Origin to
-    Base" first so the origin sits on the base.
-  * "Parent to Surface" parents placed patches to the surface so they follow it.
-  * "Whole Patch" bends the entire patch along the surface keeping its thickness
-    (geometry nodes ray-cast), with a "Bend" factor per patch.
-  * Auto Cut: a patch that goes below its base (an inset) gets a cutter built
-    from its own shape, so the surface is opened exactly where the patch dips in.
-    It is rebuilt when you confirm Place/Move, Snap, or toggle Whole Patch.
-  * Cutters (KIT OPS style insets): select one or more closed meshes, then the
-    patch (active) > "Add Selected" in the Cutters row. They are parented to the
-    patch and cut the surface with a Boolean (Difference). Wrapping, normals and
-    placement use a hidden uncut proxy of the surface, so the patch never sinks
-    into its own hole. Children named "*cutter*" are picked up automatically.
-  * While placing, an orange ring shows the footprint projected on the surface,
-    blue ticks show the normal and the patch's X direction.
+How it works
+  A *patch* is a mesh with a `base` vertex group; the *surface* is any mesh.
+  Applying a patch (setup_modifiers) gives it this modifier stack:
+      [user modifiers] > ShrinkPatch_Conform (optional, geometry nodes)
+      > ShrinkPatch_Shrinkwrap (base group) > Subdivision > ShrinkPatch_Normals
+  The patch is recognised later purely from that Shrinkwrap modifier
+  (patch_target), so nothing is kept in memory between sessions.
+
+  Insets (geometry below the base) get a cutter built from their own shape
+  (build_autocut_mesh). All cutters of a surface live in one collection used by
+  a single Boolean on the surface (SP_Cut_All). Because the surface now has
+  holes, patches wrap onto a hidden *proxy*: a copy of the surface sharing its
+  mesh and modifiers minus the cuts (ensure_proxy / wrap_object).
+
+  A depsgraph handler plus a short timer ("live sync") rebuilds cuts when a
+  patch moves, removes cutters of deleted patches and re-copies the proxy when
+  the surface changes. Files from older versions are upgraded on load.
+
+Sections, in order: settings > helpers (patch/proxy/cut model, auto cutter,
+geometry utilities, parenting, conform node group, stack ordering, setup) >
+interactive placement operator > other operators > UI panels > live sync >
+upgrade > registration.
+
+Custom properties written to the scene data:
+  surface["shrinkpatch_proxy"] / proxy["shrinkpatch_surface"]   proxy link
+  surface["shrinkpatch_cut_collection"] / coll["shrinkpatch_surface"]
+  cutter["shrinkpatch_cutter"], cutter["shrinkpatch_autocut"]
+  scene["_shrink_patch_prev_snap"]   snap settings saved by Stick While Moving
 """
 
+# Only used if the add-on is installed the legacy way; extensions read blender_manifest.toml.
 bl_info = {
     "name": "Shrink Patch",
     "author": "Matteo Fontana",
     "version": (1, 12, 0),
-    "blender": (4, 2, 0),
+    "blender": (5, 3, 0),
     "location": "View3D > N-panel > Shrink Patch  |  Object menu  |  Right-click menu",
     "description": "Interactively place patches on a surface, shrinkwrap their base and transfer normals",
     "category": "Object",
@@ -73,6 +72,7 @@ Z = Vector((0.0, 0.0, 1.0))
 
 # --------------------------------------------------------------------------- settings
 
+# Per-scene defaults for new patches (Scene.shrink_patch), shown in "New Patch Settings".
 class ShrinkPatchSettings(bpy.types.PropertyGroup):
     vertex_group: StringProperty(
         name="Base Group",
@@ -148,6 +148,7 @@ class ShrinkPatchSettings(bpy.types.PropertyGroup):
 
 
 def _settings(context):
+    """The scene's Shrink Patch settings."""
     return context.scene.shrink_patch
 
 
@@ -166,6 +167,7 @@ def patch_target(obj):
 # ---- cutters & uncut proxy surface
 
 def _obj_prop(obj, key):
+    """Object stored in obj[key], or None (also None if it was deleted)."""
     v = obj.get(key) if obj is not None else None
     return v if isinstance(v, bpy.types.Object) else None
 
@@ -189,14 +191,18 @@ def wrap_object(surface):
 
 
 def is_cutter(obj):
+    """Marked as a cutter, or a mesh with "cutter" in its name."""
     return obj is not None and obj.type == 'MESH' and (bool(obj.get(CUTTER_PROP)) or "cutter" in obj.name.lower())
 
 
 def patch_cutters(patch):
+    """The cutters parented to the patch (generated and hand-made)."""
     return [c for c in patch.children if is_cutter(c)] if patch is not None else []
 
 
 def _copy_modifier(src, dst_obj):
+    """Add a copy of modifier src to dst_obj, setting every writable property
+    (properties Blender refuses to set are skipped)."""
     new = dst_obj.modifiers.new(src.name, src.type)
     for prop in src.bl_rna.properties:
         if prop.is_readonly or prop.identifier in {"name", "type", "rna_type"}:
@@ -234,6 +240,7 @@ def ensure_proxy(surface):
 
 
 def make_cutter(obj, patch):
+    """Turn obj into a hand-made cutter of the patch (child, wire, hidden in renders)."""
     parent_keep_transform(obj, patch)
     obj[CUTTER_PROP] = True
     obj.display_type = 'WIRE'
@@ -309,6 +316,7 @@ def set_cuts_active(patch, surface, active):
 
 
 def remove_cuts(patch, surface):
+    """The patch's cutters stop cutting the surface (the objects are kept)."""
     if surface is None:
         return
     set_cuts_active(patch, surface, False)
@@ -325,6 +333,7 @@ def is_inset(patch, group_name=None):
 
 
 def autocut_of(patch):
+    """The cutter generated from the patch's shape, or None."""
     return next((c for c in patch.children if c.get(AUTOCUT_PROP)), None) if patch is not None else None
 
 
@@ -490,10 +499,13 @@ def retarget_patches(surface, wrap):
 
 
 def patches_on(scene, surface):
+    """Every patch in the scene applied to the surface."""
     return [o for o in scene.objects if o is not surface and patch_target(o) is surface]
 
 
 def _base_group_name(patch, settings):
+    """Base vertex group of the patch: the one its Shrinkwrap uses, else the
+    settings' name, else the active group (None if the patch has no groups)."""
     mod = patch.modifiers.get(SHRINK_NAME)
     if mod is not None and mod.vertex_group in patch.vertex_groups:
         return mod.vertex_group
@@ -520,10 +532,12 @@ def _base_centroid_local(patch, group_name):
 
 
 def _normal_to_world(mw, nor):
+    """Object-space normal to world space (inverse-transpose, normalised)."""
     return (mw.to_3x3().inverted_safe().transposed() @ nor).normalized()
 
 
 def _closest_on_target(target, depsgraph, world_point):
+    """Closest point and normal (world space) on the target's uncut shape."""
     ev = wrap_object(target).evaluated_get(depsgraph)
     mw = target.matrix_world
     ok, loc, nor, _ = ev.closest_point_on_mesh(mw.inverted_safe() @ world_point)
@@ -533,6 +547,7 @@ def _closest_on_target(target, depsgraph, world_point):
 
 
 def _ray_on_target(target, depsgraph, origin, direction):
+    """Ray hit and normal (world space) on the target's uncut shape, or (None, None)."""
     ev = wrap_object(target).evaluated_get(depsgraph)
     mw = target.matrix_world
     imw = mw.inverted_safe()
@@ -571,6 +586,7 @@ def ensure_normals_group(patch, base_name, normals_name):
 
 
 def _smooth_base_faces(patch, group_name):
+    """Shade smooth every face touching the base group (needed for the normal transfer)."""
     vg = patch.vertex_groups.get(group_name)
     if vg is None:
         return
@@ -597,6 +613,7 @@ def _footprint_local(patch, group_name, centroid):
 # ---- parenting
 
 def parent_keep_transform(obj, parent):
+    """Parent obj to parent (or clear it with None) without moving it."""
     if obj.parent is parent:
         return
     # rebuild the world matrix from basis data (matrix_world can be stale inside scripts)
@@ -697,6 +714,7 @@ def _conform_node_group():
 
 
 def _socket_id(ng, name):
+    """Identifier of the node group's input socket called name."""
     for item in ng.interface.items_tree:
         if item.item_type == 'SOCKET' and item.in_out == 'INPUT' and item.name == name:
             return item.identifier
@@ -709,6 +727,7 @@ def _input_owner(mod, ident):
 
 
 def _set_input(mod, name, value):
+    """Set a geometry-nodes modifier input by socket name."""
     getattr(mod.properties.inputs, _socket_id(mod.node_group, name)).value = value
 
 
@@ -738,6 +757,7 @@ def set_conform(patch, target, group_name, enable):
 
 
 def conform_factor_path(patch):
+    """(owner, property) of the Whole Patch "Factor" input for the UI, or (None, None)."""
     mod = patch.modifiers.get(CONFORM_NAME)
     if mod is None or mod.node_group is None:
         return None, None
@@ -748,6 +768,7 @@ def conform_factor_path(patch):
 # ---- placement preview
 
 def _draw_preview(state):
+    """Viewport overlay while placing: footprint ring and normal / X ticks."""
     ring, axes = state.get("ring"), state.get("axes")
     if not ring:
         return
@@ -921,6 +942,7 @@ def duplicate_patch(patch, linked=False):
 
 
 def delete_patch(patch):
+    """Delete the patch and its cutters, and update the surface's cut."""
     remove_cuts(patch, patch_target(patch))
     for obj in patch_cutters(patch) + [patch]:
         mesh = obj.data
@@ -945,6 +967,8 @@ def set_origin_to_base(obj, group_name):
 
 
 def _stick_update(self, context):
+    """Stick While Moving: switch Blender's snapping to face + align rotation,
+    saving the previous snap settings in the scene and restoring them when off."""
     ts = context.scene.tool_settings
     store = context.scene.get("_shrink_patch_prev_snap")
     if self.stick_while_moving:
@@ -974,6 +998,7 @@ def _stick_update(self, context):
 
 
 def _select_only(context, obj):
+    """Select obj alone and make it active."""
     for o in context.selected_objects:
         o.select_set(False)
     obj.hide_set(False)
@@ -1048,6 +1073,7 @@ class OBJECT_OT_shrink_patch_place(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
     # -- helpers
+    # objects are looked up by name: an operator must not keep ID references across events
     @property
     def patch(self):
         return bpy.data.objects.get(self.patch_ref)
@@ -1057,6 +1083,7 @@ class OBJECT_OT_shrink_patch_place(bpy.types.Operator):
         return bpy.data.objects.get(self.target_ref)
 
     def _status(self, context):
+        """Header text with the current values and the controls."""
         s = self.scale
         context.area.header_text_set(
             f"Shrink Patch  |  scale {s.x:.3f}  offset {self.offset:.4f}  stamped {self.stamped}  |  "
@@ -1071,6 +1098,7 @@ class OBJECT_OT_shrink_patch_place(bpy.types.Operator):
         return new
 
     def _apply(self):
+        """Move the patch to the current hit / rotation / scale / offset."""
         if self.hit is None:
             return
         self.patch.matrix_world = _place_matrix(self.rot, self.scale, self.base_local,
@@ -1098,6 +1126,7 @@ class OBJECT_OT_shrink_patch_place(bpy.types.Operator):
                                 tuple(hit), tuple(hit + u * r * 0.4)]
 
     def _mouse_update(self, context, event):
+        """Ray-cast the mouse onto the surface and slide the patch there."""
         mx, my = event.mouse_x - self.region.x, event.mouse_y - self.region.y
         if not (0 <= mx <= self.region.width and 0 <= my <= self.region.height):
             return
@@ -1114,6 +1143,7 @@ class OBJECT_OT_shrink_patch_place(bpy.types.Operator):
         self._apply()
 
     def _finish(self, context):
+        """Remove the overlay and header text; let the live sync see the patch again."""
         _watch["placing"].discard(getattr(self, "patch_ref", None))
         if getattr(self, "_draw_handle", None) is not None:
             bpy.types.SpaceView3D.draw_handler_remove(self._draw_handle, 'WINDOW')
@@ -1192,6 +1222,7 @@ class OBJECT_OT_shrink_patch_place(bpy.types.Operator):
 # --------------------------------------------------------------------------- other operators
 
 def subdiv_is_after_wrap(patch):
+    """True if the Subdivision comes after the Shrinkwrap in the patch's stack."""
     sw = patch.modifiers.find(SHRINK_NAME)
     sub = next((i for i, m in enumerate(patch.modifiers) if m.type == 'SUBSURF'), -1)
     return sw != -1 and sub != -1 and sw < sub
@@ -1406,7 +1437,7 @@ class OBJECT_OT_shrink_patch_toggle_cutters(bpy.types.Operator):
 
 
 class OBJECT_OT_shrink_patch_delete(bpy.types.Operator):
-    """Delete the patch, its cutters and the Booleans they made on the surface"""
+    """Delete the patch and its cutters, and close its cut in the surface"""
     bl_idname = "object.shrink_patch_delete"
     bl_label = "Delete Patch"
     bl_options = {'REGISTER', 'UNDO'}
@@ -1441,7 +1472,7 @@ class OBJECT_OT_shrink_patch_select(bpy.types.Operator):
 
 
 class OBJECT_OT_shrink_patch_detach(bpy.types.Operator):
-    """Detach the patch from its surface (removes the Shrink Patch modifiers and the parent)"""
+    """Detach the patch from its surface: removes the Shrink Patch modifiers, the parent and its cuts, keeps the object"""
     bl_idname = "object.shrink_patch_detach"
     bl_label = "Detach Patch"
     bl_options = {'REGISTER', 'UNDO'}
@@ -1476,18 +1507,21 @@ def _ui_surface(context):
 
 
 def _ui_active_patch(context):
+    """The active object if it is a patch, else None."""
     active = context.active_object
     return active if active is not None and patch_target(active) is not None else None
 
 
+# Shared placement of every panel: Sidebar (N) > "Shrink Patch" tab.
+# Panel docstrings would show up as tooltips, so panels are described with comments.
 class _ShrinkPatchPanel:
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Shrink Patch"
 
 
+# Main panel: what is selected, the Place button, Stick While Moving.
 class VIEW3D_PT_shrink_patch(_ShrinkPatchPanel, bpy.types.Panel):
-    """Main panel: what is selected + the Place button."""
     bl_label = "Shrink Patch"
 
     def draw(self, context):
@@ -1505,8 +1539,8 @@ class VIEW3D_PT_shrink_patch(_ShrinkPatchPanel, bpy.types.Panel):
         layout.prop(settings, "stick_while_moving", icon='SNAP_ON' if settings.stick_while_moving else 'SNAP_OFF')
 
 
+# Defaults used when a new patch is applied.
 class VIEW3D_PT_shrink_patch_settings(_ShrinkPatchPanel, bpy.types.Panel):
-    """Defaults used when a new patch is applied."""
     bl_label = "New Patch Settings"
     bl_parent_id = "VIEW3D_PT_shrink_patch"
     bl_options = {'DEFAULT_CLOSED'}
@@ -1553,8 +1587,8 @@ class VIEW3D_PT_shrink_patch_subdiv(_ShrinkPatchPanel, bpy.types.Panel):
         layout.operator(OBJECT_OT_shrink_patch_apply_subdiv.bl_idname, icon='FILE_REFRESH')
 
 
+# Every patch applied to the surface, with per-patch buttons.
 class VIEW3D_PT_shrink_patch_overview(_ShrinkPatchPanel, bpy.types.Panel):
-    """Every patch applied to the surface."""
     bl_label = "Patches"
     bl_parent_id = "VIEW3D_PT_shrink_patch"
 
@@ -1587,8 +1621,8 @@ class VIEW3D_PT_shrink_patch_overview(_ShrinkPatchPanel, bpy.types.Panel):
             row.operator(OBJECT_OT_shrink_patch_delete.bl_idname, text="", icon='TRASH').patch_name = p.name
 
 
+# The active patch: scale and actions; Deform / Normals / Cuts are its sub-panels.
 class VIEW3D_PT_shrink_patch_active(_ShrinkPatchPanel, bpy.types.Panel):
-    """The active patch: transform and actions."""
     bl_label = "Active Patch"
     bl_parent_id = "VIEW3D_PT_shrink_patch"
 
@@ -1707,6 +1741,7 @@ class VIEW3D_PT_shrink_patch_cuts(_ShrinkPatchPanel, bpy.types.Panel):
 
 
 def _menu(self, context):
+    """Entries added to the Object menu and the right-click menu."""
     layout = self.layout
     layout.separator()
     layout.operator(OBJECT_OT_shrink_patch_place.bl_idname, icon='MOD_SHRINKWRAP')
@@ -1764,6 +1799,7 @@ def _rel_key(patch):
 
 
 def remember_placement(patch):
+    """Store where the patch sits now, so the live sync can tell a real move."""
     key = _rel_key(patch)
     if key is not None:
         _watch["rel"][patch.name] = key
@@ -1794,6 +1830,7 @@ def _modifier_signature(obj, skip_cuts=False):
 
 
 def sync_proxy_if_needed(surface):
+    """Re-copy the proxy if the surface's mesh or modifiers changed. True if it did."""
     proxy = _proxy_of(surface)
     if proxy is None:
         return False
@@ -1830,6 +1867,7 @@ def cleanup_orphan_cutters():
 
 
 def _transform_running():
+    """True while the user is dragging (G / R / S, or the Place operator)."""
     for win in bpy.context.window_manager.windows:
         for op in win.modal_operators:
             if op.bl_idname.startswith("TRANSFORM_OT") or op.bl_idname == "OBJECT_OT_shrink_patch_place":
@@ -1863,6 +1901,8 @@ def process_watch():
 
 
 def _watch_tick():
+    """Timer callback: wait until things are calm and no drag is running, then
+    process what the depsgraph handler recorded."""
     wait = WATCH_DELAY - (time.monotonic() - _watch["last"])
     if wait > 0:
         return wait
@@ -1878,6 +1918,7 @@ def _watch_tick():
 
 @persistent
 def _on_depsgraph_update(scene, depsgraph):
+    """Record moved Auto Cut patches and changed surfaces; arm the timer."""
     if _watch["busy"]:
         return  # our own changes
     for u in depsgraph.updates:
@@ -1923,6 +1964,7 @@ def upgrade_existing_patches():
 
 @persistent
 def _on_load_post(*_args):
+    """After a file loads: upgrade old patches, remember current placements."""
     _watch["rel"].clear()
     _watch["placing"].clear()
     try:
@@ -1935,11 +1977,13 @@ def _on_load_post(*_args):
 
 
 def _upgrade_after_enable():
+    """One-shot timer: upgrade the file that was already open when the add-on was enabled."""
     _on_load_post()
     return None  # run once
 
 
 def register():
+    """Register classes, the scene settings, menus, handlers and the one-shot upgrade."""
     for c in classes:
         bpy.utils.register_class(c)
     bpy.types.Scene.shrink_patch = PointerProperty(type=ShrinkPatchSettings)
@@ -1952,6 +1996,7 @@ def register():
 
 
 def unregister():
+    """Undo register(), including handlers and pending timers."""
     if _on_load_post in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(_on_load_post)
     if _on_depsgraph_update in bpy.app.handlers.depsgraph_update_post:
