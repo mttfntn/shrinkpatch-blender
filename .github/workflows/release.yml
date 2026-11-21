@@ -53,9 +53,37 @@ jobs:
           "${{ steps.blender.outputs.blender }}" -b --factory-startup \
             --command extension build --source-dir shrinkpatch --output-dir dist
 
+      # Data for the README's "download size" badge (shields.io endpoint format).
+      # shields.io refuses release-download URLs but reads raw.githubusercontent.com,
+      # so the file goes to a separate one-commit `badges` branch (main is untouched).
+      - name: Write the size badge data
+        run: |
+          python3 - <<'EOF'
+          import glob, json, os
+          size = os.path.getsize(glob.glob("dist/*.zip")[0])
+          text = f"{size / 1024:.1f} KB" if size < 1024 ** 2 else f"{size / 1024 ** 2:.1f} MB"
+          json.dump({"schemaVersion": 1, "label": "download size", "message": text, "color": "blue"},
+                    open("dist/release-size.json", "w"))
+          print(text)
+          EOF
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${GITHUB_REF_NAME}" dist/*.zip \
             --title "Shrink Patch ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag
+
+      - name: Update the badges branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          work=$(mktemp -d)
+          cp dist/release-size.json "$work/"
+          cd "$work"
+          git init -q -b badges
+          git add release-size.json
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Download-size badge data for ${GITHUB_REF_NAME}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/badges

@@ -136,7 +136,7 @@ python tests/run.py --installed dist/shrinkpatch-1.13.0.zip
    ```
 
 4. GitHub Actions (`release.yml`) runs the full tests, checks that the tag matches the manifest version, builds the zip, and publishes the release with the zip attached. Check it with `gh run list` and `gh release view v1.2.3`.
-5. **The README badges update themselves**: release, license and language come from GitHub, the Blender version from the manifest on `main`, and `tests` is GitHub's own badge. Nothing to edit by hand.
+5. **The README badges update themselves**: release, license and language come from GitHub, the Blender version from the manifest on `main`, and `tests` is GitHub's own badge. The download-size badge reads `release-size.json` from the `badges` branch, which `release.yml` rewrites (one commit, force-pushed) at every release. Nothing to edit by hand.
 
 ## Updates from the original project
 

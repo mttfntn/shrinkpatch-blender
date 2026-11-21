@@ -43,7 +43,7 @@ settings → model (`patch_target`, `real_surface`/`wrap_object`/`_proxy_of`, `e
 - **Every bug fix gets a regression test that fails before the fix.**
 - **Panels:** no docstrings (they become tooltips); use `#` comments. Operator docstrings are user tooltips: keep them accurate.
 - **Never delete** the user's `.blend` / `.blend1` files. They're git-ignored and stay local.
-- **The version lives in three places:** the manifest, `bl_info`, and README (version line, history). The README badges are live (shields.io, GitHub): never hard-code versions in them.
+- **The version lives in three places:** the manifest, `bl_info`, and README (version line, history). The README badges are live (shields.io, GitHub): never hard-code versions in them. The download-size badge reads `release-size.json` on the `badges` branch, which `release.yml` force-pushes at each release: don't delete that branch.
 - **Commits:** small, with a message that says how the change was verified.
 
 ## Pitfalls (each one happened here)
