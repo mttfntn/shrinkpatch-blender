@@ -233,11 +233,6 @@ def ensure_proxy(surface):
     return proxy
 
 
-def _boolean_solver():
-    items = bpy.types.BooleanModifier.bl_rna.properties['solver'].enum_items.keys()
-    return 'MANIFOLD' if 'MANIFOLD' in items else 'EXACT'
-
-
 def make_cutter(obj, patch):
     parent_keep_transform(obj, patch)
     obj[CUTTER_PROP] = True
@@ -280,7 +275,7 @@ def _update_cut_modifier(surface):
     if mod is None:
         mod = surface.modifiers.new(CUTS_NAME, 'BOOLEAN')
         mod.operation = 'DIFFERENCE'
-        mod.solver = _boolean_solver()
+        mod.solver = 'MANIFOLD'  # fast, and fine for the closed cutters used here
     mod.operand_type = 'COLLECTION'
     mod.collection = coll
 
@@ -623,7 +618,7 @@ def _conform_node_group():
     itf = ng.interface
     itf.new_socket("Geometry", in_out='INPUT', socket_type='NodeSocketGeometry')
     itf.new_socket("Surface", in_out='INPUT', socket_type='NodeSocketObject')
-    s = itf.new_socket("Base Height", in_out='INPUT', socket_type='NodeSocketFloat')
+    itf.new_socket("Base Height", in_out='INPUT', socket_type='NodeSocketFloat')
     s = itf.new_socket("Search Distance", in_out='INPUT', socket_type='NodeSocketFloat')
     s.default_value, s.min_value = 1.0, 0.0
     s = itf.new_socket("Factor", in_out='INPUT', socket_type='NodeSocketFloat')
@@ -660,13 +655,9 @@ def _conform_node_group():
     fac = node('ShaderNodeVectorMath', 750, -200, operation='SCALE')
     setp = node('GeometryNodeSetPosition', 750, 50)
 
-    def attr(sockets):
-        cands = [s for s in sockets if s.name == 'Attribute' and getattr(s, 'enabled', True)]
-        return next((s for s in cands if s.type == 'VECTOR'), cands[0])
-
     L.new(gin.outputs['Surface'], info.inputs['Object'])
     L.new(info.outputs['Geometry'], ray.inputs['Target Geometry'])
-    L.new(nrm.outputs['Normal'], attr(ray.inputs))
+    L.new(nrm.outputs['Normal'], ray.inputs['Attribute'])
     L.new(pos.outputs['Position'], sep.inputs['Vector'])
     L.new(gin.outputs['Base Height'], top.inputs[0])
     L.new(gin.outputs['Search Distance'], top.inputs[1])
@@ -678,7 +669,7 @@ def _conform_node_group():
     L.new(length.outputs[0], ray.inputs['Ray Length'])
     L.new(sep.outputs['Z'], height.inputs[0])
     L.new(gin.outputs['Base Height'], height.inputs[1])
-    L.new(attr(ray.outputs), unit.inputs[0])
+    L.new(ray.outputs['Attribute'], unit.inputs[0])
     L.new(unit.outputs['Vector'], lift.inputs[0])
     L.new(height.outputs[0], lift.inputs['Scale'])
     L.new(ray.outputs['Hit Position'], new_pos.inputs[0])
@@ -702,22 +693,12 @@ def _socket_id(ng, name):
 
 
 def _input_owner(mod, ident):
-    """(owner, prop_name) for a geometry-nodes modifier input; Blender 5.x API with 4.x fallback."""
-    props = getattr(mod, "properties", None)
-    if props is not None and hasattr(props, "inputs"):
-        sock = getattr(props.inputs, ident, None)
-        if sock is not None:
-            return sock, "value"
-    return mod, f'["{ident}"]'
+    """(owner, prop_name) of a geometry-nodes modifier input (Blender 5.x API)."""
+    return getattr(mod.properties.inputs, ident), "value"
 
 
 def _set_input(mod, name, value):
-    ident = _socket_id(mod.node_group, name)
-    owner, prop = _input_owner(mod, ident)
-    if prop == "value":
-        owner.value = value
-    else:
-        mod[ident] = value
+    getattr(mod.properties.inputs, _socket_id(mod.node_group, name)).value = value
 
 
 def set_conform(patch, target, group_name, enable):
@@ -1831,9 +1812,8 @@ def cleanup_orphan_cutters():
 
 
 def _transform_running():
-    wm = bpy.context.window_manager
-    for win in getattr(wm, "windows", []):
-        for op in getattr(win, "modal_operators", []):
+    for win in bpy.context.window_manager.windows:
+        for op in win.modal_operators:
             if op.bl_idname.startswith("TRANSFORM_OT") or op.bl_idname == "OBJECT_OT_shrink_patch_place":
                 return True
     return False
@@ -1883,7 +1863,7 @@ def _on_depsgraph_update(scene, depsgraph):
     if _watch["busy"]:
         return  # our own changes
     for u in depsgraph.updates:
-        ob = getattr(u.id, "original", u.id)
+        ob = u.id.original
         if not isinstance(ob, bpy.types.Object) or ob.type != 'MESH':
             continue
         if u.is_updated_transform and ob.name not in _watch["placing"] and autocut_of(ob) is not None:
