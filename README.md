@@ -1,5 +1,11 @@
 # Shrink Patch
 
+[![Blender 5.3](https://img.shields.io/badge/Blender-5.3-E87D0D?logo=blender&logoColor=white)](https://www.blender.org/download/)
+[![Release v1.13.0](https://img.shields.io/badge/release-v1.13.0-blue)](https://github.com/mttfntn/shrinkpatch-blender/releases/latest)
+[![tests](https://github.com/mttfntn/shrinkpatch-blender/actions/workflows/tests.yml/badge.svg)](https://github.com/mttfntn/shrinkpatch-blender/actions/workflows/tests.yml)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-green)](LICENSE)
+[![Python](https://img.shields.io/badge/language-Python-3776AB?logo=python&logoColor=white)](shrinkpatch/__init__.py)
+
 A Blender add-on for placing **patches**, meaning modelled details such as bosses, rings, sockets or insets, onto any surface. Each patch blends into the surface without a visible seam.
 
 You place a patch by moving the mouse over the surface. The add-on then:
@@ -10,9 +16,12 @@ You place a patch by moving the mouse over the surface. The add-on then:
 
 Patches stay live. You can move, scale, duplicate or delete them at any time, and the cuts and wrapping keep up.
 
-- **Version:** 1.12.0
-- **Blender:** 4.2 or newer (developed and tested on 5.3)
+- **Version:** 1.13.0
+- **Blender:** 5.3 (the only supported and tested version)
 - **Location:** 3D Viewport › Sidebar (N) › **Shrink Patch** tab. Also in the Object menu and the right-click menu.
+- **License:** GPL-3.0-or-later ([LICENSE](LICENSE))
+
+Working on the add-on itself? See [HANDOVER.md](HANDOVER.md) (people) and [AGENTS.md](AGENTS.md) (AI assistants).
 
 ---
 
@@ -35,11 +44,12 @@ Patches stay live. You can move, scale, duplicate or delete them at any time, an
 
 ## Installation
 
-1. In Blender, open **Edit › Preferences › Get Extensions**.
-2. Click the **⌄** menu at the top right and choose **Install from Disk…**
-3. Select **`shrinkpatch.zip`**. The add-on is enabled straight away.
+1. Download **`shrinkpatch-X.Y.Z.zip`** from the [Releases](https://github.com/mttfntn/shrinkpatch-blender/releases) page.
+2. In Blender, open **Edit › Preferences › Get Extensions**.
+3. Click the **⌄** menu at the top right and choose **Install from Disk…**
+4. Select the zip. The add-on is enabled straight away.
 
-You can also drag `shrinkpatch.zip` into the Blender window.
+You can also drag the zip into the Blender window. The package only installs on Blender 5.3.
 
 **Updating:** install the new zip the same way. It replaces the old version.
 
@@ -283,6 +293,7 @@ All helpers are hidden in the viewport and in renders. Don't delete them by hand
 
 | Version | Changes |
 |---|---|
+| 1.13 | Blender 5.3 only. Fixes: inset with Transfer Normals off no longer fails; the surface can no longer show through a tightly curved inset; Stick While Moving restores "Affect Translate"; the live sync no longer rebuilds the proxy on every check. Valid manifest (the old tagline was too long), GPL-3.0 license in the package, test suite and CI |
 | 1.12 | Live sync: cuts follow G-moves, X cleans up cutters, the proxy follows the surface |
 | 1.11 | Automatic upgrade of patches from older versions when a file opens or the add-on is enabled |
 | 1.10 | Collapsible panel sections; vertical Scale; Offset field and mapping selector removed |
