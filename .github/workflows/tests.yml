@@ -50,8 +50,5 @@ jobs:
       - name: Tests (installed package)
         run: python3 tests/run.py --blender "${{ steps.blender.outputs.blender }}" --installed dist/*.zip
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: shrinkpatch-package
-          path: dist/*.zip
-          retention-days: 3
+      # No artifact upload: the release publishes the zip as a release asset, and
+      # artifacts count against the account's shared Actions storage quota.

@@ -77,4 +77,4 @@ settings → model (`patch_target`, `real_surface`/`wrap_object`/`_proxy_of`, `e
 
 - **Remote:** `origin https://github.com/mttfntn/shrinkpatch-blender.git` (HTTPS, authenticated with `gh`). The default branch is `main`.
 - **Ignored:** `*.blend*`, `dist/`, `*.zip`, `__pycache__/`.
-- **CI** (`tests.yml`) runs on pushes to `main`, pull requests, and when called by `release.yml`. Artifacts are kept 3 days. The Blender download is cached by version and checksum.
+- **CI** (`tests.yml`) runs on pushes to `main`, pull requests, and when called by `release.yml`. No artifacts are stored (the account's artifact quota is shared). The Blender download is cached by version and checksum.

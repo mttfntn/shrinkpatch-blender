@@ -39,7 +39,7 @@ The tests find Blender through `--blender PATH`, then `$BLENDER`, then the usual
 | `tests/behaviour_snapshot.py` | Records what the add-on does for 192 option combinations, as JSON |
 | `tests/compare_snapshots.py` | Compares two snapshots with the measured noise tolerances |
 | `.github/actions/setup-blender/` | CI: downloads Blender (official server plus mirrors, retries, SHA-256), caches it |
-| `.github/workflows/tests.yml` | CI on every push to `main` and every pull request |
+| `.github/workflows/tests.yml` | CI on every push to `main` and every pull request (tests and build; no artifacts are stored) |
 | `.github/workflows/release.yml` | Release on a `vX.Y.Z` tag |
 | `README.md` | User guide |
 | `HANDOVER.md`, `AGENTS.md` | This handover. Not shipped, because the package is only `shrinkpatch/`. |
