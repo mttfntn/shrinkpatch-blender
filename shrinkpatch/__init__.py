@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Matteo Fontana
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Shrink Patch: place patch meshes on a surface, wrap them, blend their shading
 and (for insets) cut the surface open. Blender 5.3 extension, single module.
 
@@ -35,7 +38,7 @@ Custom properties written to the scene data:
 bl_info = {
     "name": "Shrink Patch",
     "author": "Matteo Fontana",
-    "version": (1, 12, 0),
+    "version": (1, 13, 0),
     "blender": (5, 3, 0),
     "location": "View3D > N-panel > Shrink Patch  |  Object menu  |  Right-click menu",
     "description": "Interactively place patches on a surface, shrinkwrap their base and transfer normals",

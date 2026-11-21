@@ -2,10 +2,13 @@
 
 Start it with tests/run.py, which launches an isolated Blender:
     python tests/run.py [--blender PATH] [--addon-dir DIR]
+    python tests/run.py --installed dist/shrinkpatch-X.Y.Z.zip
 
-The add-on is imported from --addon-dir (the folder that contains the
-`shrinkpatch` package; by default the repository root) and registered by hand,
-so the installed copy and the user's preferences are never used.
+By default the add-on is imported from --addon-dir (the folder that contains
+the `shrinkpatch` package; the repository root) and registered by hand. With
+--installed, the built package is installed as an extension in the throw-away
+profile and enabled the way Blender does it (SHRINKPATCH_MODULE is then the
+extension's module name). The user's own Blender and preferences are never used.
 Each test builds its own scene with tests/fixtures.py.
 """
 
@@ -23,17 +26,28 @@ from mathutils import Matrix, Vector
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fixtures as fx  # noqa: E402
 
-ADDON_DIR = os.environ.get("SHRINKPATCH_ADDON_DIR") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ADDON_DIR)
-sp = importlib.import_module("shrinkpatch")
+INSTALLED_MODULE = os.environ.get("SHRINKPATCH_MODULE")  # e.g. bl_ext.user_default.shrinkpatch
+if INSTALLED_MODULE:
+    import addon_utils
+    sp = addon_utils.enable(INSTALLED_MODULE, default_set=True)
+    assert sp is not None, f"could not enable {INSTALLED_MODULE}"
+else:
+    ADDON_DIR = os.environ.get("SHRINKPATCH_ADDON_DIR") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.insert(0, ADDON_DIR)
+    sp = importlib.import_module("shrinkpatch")
 
 
 def setUpModule():
-    sp.register()
+    print(f"SHRINKPATCH_UNDER_TEST {sp.__name__} from {sp.__file__}")
+    if not INSTALLED_MODULE:
+        sp.register()
 
 
 def tearDownModule():
-    sp.unregister()
+    if INSTALLED_MODULE:
+        addon_utils.disable(INSTALLED_MODULE, default_set=True)
+    else:
+        sp.unregister()
 
 
 class PatchCase(unittest.TestCase):
