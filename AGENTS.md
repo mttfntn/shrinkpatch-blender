@@ -5,7 +5,7 @@ Compact guide for AI coding assistants. The human version, with more context, is
 ## Project
 
 - **What it is:** a Blender **5.3-only** extension (single module `shrinkpatch/__init__.py`, GPL-3.0-or-later, author Matteo Fontana, not a fork). It places patch meshes on a surface: Shrinkwrap the `base` group, Data Transfer custom normals from `base_normals`, optional Geometry Nodes bend, auto-cut insets with one collection Boolean on the surface, wrap onto a hidden uncut proxy, live sync via a depsgraph handler and a timer.
-- **Repo:** `https://github.com/mttfntn/shrinkpatch-blender` (private). Branch `main`; release tags `vX.Y.Z` (annotated; the message becomes the release notes).
+- **Repo:** `https://github.com/mttfntn/shrinkpatch-blender` (public). Branch `main`; release tags `vX.Y.Z` (annotated; the message becomes the release notes).
 
 ## Commands
 
@@ -43,7 +43,7 @@ settings → model (`patch_target`, `real_surface`/`wrap_object`/`_proxy_of`, `e
 - **Every bug fix gets a regression test that fails before the fix.**
 - **Panels:** no docstrings (they become tooltips); use `#` comments. Operator docstrings are user tooltips: keep them accurate.
 - **Never delete** the user's `.blend` / `.blend1` files. They're git-ignored and stay local.
-- **The version lives in three places:** the manifest, `bl_info`, and README (version line, static release badge, history).
+- **The version lives in three places:** the manifest, `bl_info`, and README (version line, history). The README badges are live (shields.io, GitHub): never hard-code versions in them.
 - **Commits:** small, with a message that says how the change was verified.
 
 ## Pitfalls (each one happened here)
@@ -67,11 +67,15 @@ settings → model (`patch_target`, `real_surface`/`wrap_object`/`_proxy_of`, `e
 
 ## Release checklist
 
-1. Bump the version in the manifest, `bl_info` and README (including the static badge and the history).
+1. Bump the version in the manifest, `bl_info` and README (version line and history).
 2. Run the tests from source, build, run the tests on the package.
 3. `git tag -a vX.Y.Z -m "<notes>"`, then `git push origin main vX.Y.Z`.
 4. `release.yml`: tests → checks the tag equals the manifest version → fetches the annotated tag → builds → `gh release create` with the zip and the tag message as notes.
 5. Verify with `gh run list --workflow release.yml` and `gh release view vX.Y.Z`.
+
+## Community files
+
+- Issue forms in `.github/ISSUE_TEMPLATE/` (blank issues are disabled), the PR template in `.github/pull_request_template.md`, plus `CONTRIBUTING.md` and `SECURITY.md` (private vulnerability reports).
 
 ## Git setup
 

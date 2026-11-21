@@ -1,10 +1,10 @@
 # Shrink Patch
 
-[![Blender 5.3](https://img.shields.io/badge/Blender-5.3-E87D0D?logo=blender&logoColor=white)](https://www.blender.org/download/)
-[![Release v1.13.0](https://img.shields.io/badge/release-v1.13.0-blue)](https://github.com/mttfntn/shrinkpatch-blender/releases/latest)
+[![Blender](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmttfntn%2Fshrinkpatch-blender%2Fmain%2Fshrinkpatch%2Fblender_manifest.toml&query=%24.blender_version_min&label=Blender&color=E87D0D&logo=blender&logoColor=white)](https://www.blender.org/download/)
+[![Release](https://img.shields.io/github/v/release/mttfntn/shrinkpatch-blender)](https://github.com/mttfntn/shrinkpatch-blender/releases/latest)
 [![tests](https://github.com/mttfntn/shrinkpatch-blender/actions/workflows/tests.yml/badge.svg)](https://github.com/mttfntn/shrinkpatch-blender/actions/workflows/tests.yml)
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-green)](LICENSE)
-[![Python](https://img.shields.io/badge/language-Python-3776AB?logo=python&logoColor=white)](shrinkpatch/__init__.py)
+[![License](https://img.shields.io/github/license/mttfntn/shrinkpatch-blender)](LICENSE)
+[![Language](https://img.shields.io/github/languages/top/mttfntn/shrinkpatch-blender)](shrinkpatch/__init__.py)
 
 A Blender add-on for placing **patches**, meaning modelled details such as bosses, rings, sockets or insets, onto any surface. Each patch blends into the surface without a visible seam.
 
@@ -21,7 +21,7 @@ Patches stay live. You can move, scale, duplicate or delete them at any time, an
 - **Location:** 3D Viewport › Sidebar (N) › **Shrink Patch** tab. Also in the Object menu and the right-click menu.
 - **License:** GPL-3.0-or-later ([LICENSE](LICENSE))
 
-Working on the add-on itself? See [HANDOVER.md](HANDOVER.md) (people) and [AGENTS.md](AGENTS.md) (AI assistants).
+Found a bug or have an idea? [Open an issue](https://github.com/mttfntn/shrinkpatch-blender/issues/new/choose). Want to change the code? See [CONTRIBUTING.md](CONTRIBUTING.md), [HANDOVER.md](HANDOVER.md) (people) and [AGENTS.md](AGENTS.md) (AI assistants).
 
 ---
 

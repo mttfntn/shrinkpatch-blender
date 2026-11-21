@@ -14,7 +14,7 @@ Shrink Patch is a Blender extension (add-on) that places modelled **patches** on
 Patches stay live: moving, duplicating, deleting or changing the surface keeps everything consistent.
 
 - **Author:** Matteo Fontana. **License:** GPL-3.0-or-later. **Not a fork:** there is no upstream project.
-- **Repository:** <https://github.com/mttfntn/shrinkpatch-blender> (private), branch `main`.
+- **Repository:** <https://github.com/mttfntn/shrinkpatch-blender> (public), branch `main`. Issues and pull requests use the forms in `.github/`; contributors start from [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What you need
 
@@ -42,6 +42,8 @@ The tests find Blender through `--blender PATH`, then `$BLENDER`, then the usual
 | `.github/workflows/tests.yml` | CI on every push to `main` and every pull request (tests and build; no artifacts are stored) |
 | `.github/workflows/release.yml` | Release on a `vX.Y.Z` tag |
 | `README.md` | User guide |
+| `CONTRIBUTING.md`, `SECURITY.md` | How to report bugs / send pull requests; how to report security problems privately |
+| `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` | Bug and feature forms (blank issues disabled); pull request checklist |
 | `HANDOVER.md`, `AGENTS.md` | This handover. Not shipped, because the package is only `shrinkpatch/`. |
 
 Not in the repo (see `.gitignore`): `.blend` scenes (the demo scene stays local), `dist/` and `*.zip` (build output), `__pycache__`.
@@ -116,7 +118,7 @@ python tests/run.py --installed dist/shrinkpatch-1.13.0.zip
 
 ## How to make a release
 
-1. Set the new version in **three places**: `shrinkpatch/blender_manifest.toml` (`version`), `bl_info["version"]` in `__init__.py`, and `README.md` (the "Version" line, the **release badge**, and the version history).
+1. Set the new version in **three places**: `shrinkpatch/blender_manifest.toml` (`version`), `bl_info["version"]` in `__init__.py`, and `README.md` (the "Version" line and the version history).
 2. Run both test commands above. Build locally to check:
 
    ```powershell
@@ -134,7 +136,7 @@ python tests/run.py --installed dist/shrinkpatch-1.13.0.zip
    ```
 
 4. GitHub Actions (`release.yml`) runs the full tests, checks that the tag matches the manifest version, builds the zip, and publishes the release with the zip attached. Check it with `gh run list` and `gh release view v1.2.3`.
-5. **The repo is private**, so the README badges are static (shields.io): update the release badge's version by hand in step 1. The `tests` badge is GitHub's own and updates itself (it is only visible to people with access to the repo).
+5. **The README badges update themselves**: release, license and language come from GitHub, the Blender version from the manifest on `main`, and `tests` is GitHub's own badge. Nothing to edit by hand.
 
 ## Updates from the original project
 

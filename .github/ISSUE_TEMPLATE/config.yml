@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: User guide and troubleshooting
+    url: https://github.com/mttfntn/shrinkpatch-blender#contents
+    about: How to prepare, place and edit patches, and fixes for common problems.
+  - name: Report a security problem privately
+    url: https://github.com/mttfntn/shrinkpatch-blender/security/advisories/new
+    about: Please do not open a public issue for security problems.
