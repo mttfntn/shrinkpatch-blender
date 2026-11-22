@@ -2,6 +2,7 @@
 
 [![Blender](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmttfntn%2Fshrinkpatch-blender%2Fmain%2Fshrinkpatch%2Fblender_manifest.toml&query=%24.blender_version_min&label=Blender&color=E87D0D&logo=blender&logoColor=white)](https://www.blender.org/download/)
 [![Release](https://img.shields.io/github/v/release/mttfntn/shrinkpatch-blender)](https://github.com/mttfntn/shrinkpatch-blender/releases/latest)
+[![Download size](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmttfntn%2Fshrinkpatch-blender%2Fmain%2F.github%2Frelease-size.json)](https://github.com/mttfntn/shrinkpatch-blender/releases/latest)
 [![tests](https://github.com/mttfntn/shrinkpatch-blender/actions/workflows/tests.yml/badge.svg)](https://github.com/mttfntn/shrinkpatch-blender/actions/workflows/tests.yml)
 [![License](https://img.shields.io/github/license/mttfntn/shrinkpatch-blender)](LICENSE)
 [![Language](https://img.shields.io/github/languages/top/mttfntn/shrinkpatch-blender)](shrinkpatch/__init__.py)
